@@ -237,7 +237,7 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
     }
 
-    /* Søgeboks med live dropdown */
+    /* Samlet søgeboks */
     .preset-box {
       background: linear-gradient(180deg, #f0f7ff 0%, #e0effe 100%);
       border: 1px solid #bae6fd;
@@ -252,7 +252,7 @@
       margin-bottom: 12px;
     }
 
-    /* Live dropdown liste */
+    /* Live dropdown liste lige under feltet */
     .search-results-dropdown {
       position: absolute;
       top: 100%;
@@ -261,7 +261,7 @@
       background: #ffffff;
       border: 1.5px solid #cbd5e1;
       border-radius: 10px;
-      max-height: 200px;
+      max-height: 220px;
       overflow-y: auto;
       z-index: 100;
       box-shadow: 0 8px 20px rgba(0,0,0,0.1);
@@ -269,7 +269,7 @@
     }
 
     .search-result-item {
-      padding: 10px 12px;
+      padding: 11px 14px;
       font-size: 0.9rem;
       border-bottom: 1px solid #f1f5f9;
       cursor: pointer;
@@ -462,30 +462,30 @@
       <span id="sectionTitle">Tilføj måltid til Dag 1</span>
     </div>
     
-    <!-- Live søgeboks -->
+    <!-- Samlet søg og vælg fødevare felt -->
     <div class="preset-box">
-      <label for="searchFood">🔍 Søg i fødevaredatabasen (500 varer)</label>
+      <label for="searchFood">🔍 Søg og vælg fødevare (500 varer)</label>
       <div class="search-wrapper">
-        <input type="text" id="searchFood" placeholder="Skriv fx 'kylling' eller 'æg'..." autocomplete="off" oninput="onSearchInput()">
+        <input type="text" id="searchFood" placeholder="Skriv fx 'kylling', 'æg', 'rugbrød'..." autocomplete="off" oninput="onSearchInput()">
         <div id="searchResults" class="search-results-dropdown"></div>
       </div>
 
       <div class="unit-row">
         <div>
           <label for="foodAmount" id="amountLabel">Mængde</label>
-          <input type="number" id="foodAmount" value="1" min="0.1" step="0.1" oninput="calculateFromPreset()">
+          <input type="number" id="foodAmount" value="100" min="0.1" step="10" oninput="calculateFromPreset()">
         </div>
         <div>
           <label for="foodUnit">Enhed</label>
           <select id="foodUnit" onchange="onUnitChanged()">
-            <option value="stk" id="unitStkOption">Stk / Portion</option>
             <option value="g">Gram (g)</option>
+            <option value="stk" id="unitStkOption">Stk / Portion</option>
           </select>
         </div>
       </div>
 
       <div class="helper-text" id="weightHelper">
-        Søg og tryk på en madvare ovenfor for at vælge den.
+        Skriv i feltet ovenfor og tryk på en fødevare på listen.
       </div>
     </div>
 
@@ -710,8 +710,8 @@
         ["Kokosmælk (almindelig)", 1.8, 3.0, 18.0, 100, "dl"],
         ["Kokosmælk (light)", 0.8, 1.5, 6.0, 100, "dl"],
         ["Smør (Lurpak)", 0.6, 0.7, 82.0, 10, "knivspids/tsk"],
-        ["Kærgården (original)", 0.5, 0.6, 72.0, 10, "knivspids/tsk"],
-        ["Kærgården (let)", 0.5, 1.0, 40.0, 10, "knivspids/tsk"],
+        ["Kærgården (original)", 0.5, 0.6, 72.0, 10, "skive/tsk"],
+        ["Kærgården (let)", 0.5, 1.0, 40.0, 10, "skive/tsk"],
         ["Plantemargarine / Bakkedal", 0.4, 0.5, 70.0, 10, "tsk"],
         ["Skæreost 45+ (26% fedt)", 25.0, 0.0, 26.0, 20, "skive"],
         ["Skæreost 30+ (17% fedt)", 28.0, 0.0, 17.0, 20, "skive"],
@@ -1114,7 +1114,6 @@
       4: []
     };
 
-    // Live søgning der viser resultater lige nedenunder
     function onSearchInput() {
       const query = document.getElementById('searchFood').value.toLowerCase().trim();
       const dropdown = document.getElementById('searchResults');
@@ -1138,7 +1137,6 @@
         return;
       }
 
-      // Vis op til 15 resultater for ikke at overvælde skærmen
       matches.slice(0, 15).forEach(item => {
         const div = document.createElement('div');
         div.className = 'search-result-item';
@@ -1152,7 +1150,6 @@
       dropdown.style.display = 'block';
     }
 
-    // Når brugeren klikker på en madvare i dropdown-listen
     function selectFoodItem(index) {
       selectedFoodIndex = index;
       const food = foodDatabase[index];
