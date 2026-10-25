@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Makro Tracker</title>
+  <title>Makro Tracker - 4 Dage</title>
 
   <!-- iOS PWA Konfiguration -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,7 +22,7 @@
       color: #1c1c1e;
       margin: 0;
       padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px) 16px;
-      max-width: 500px;
+      max-width: 520px;
       margin-left: auto;
       margin-right: auto;
     }
@@ -76,20 +76,36 @@
       margin-bottom: 4px;
     }
 
-    input {
+    input, select {
       width: 100%;
       padding: 10px;
       border: 1px solid #c7c7cc;
       border-radius: 8px;
       font-size: 1rem;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       background-color: #fbfbfb;
+      color: #1c1c1e;
     }
 
-    input:focus {
+    input:focus, select:focus {
       outline: none;
       border-color: #007aff;
       background-color: #ffffff;
+    }
+
+    /* Blå boks til fødevaresøgning og stk/gram valg */
+    .preset-box {
+      background-color: #eef4ff;
+      border: 1px solid #cce0ff;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+
+    .unit-row {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 8px;
     }
 
     .input-row {
@@ -108,6 +124,12 @@
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
+    }
+
+    .helper-text {
+      font-size: 0.75rem;
+      color: #4a5568;
+      margin-top: 2px;
     }
 
     /* Tabeller og slet-knapper */
@@ -166,24 +188,55 @@
     <button class="segment-btn" onclick="setDay(4)">Dag 4</button>
   </div>
 
-  <!-- Indtastning -->
+  <!-- Indtastning og Fødevaredatabase -->
   <div class="card">
     <div id="sectionTitle" style="font-weight:bold; margin-bottom:10px;">Tilføj mad til Dag 1</div>
+    
+    <!-- Søg og vælg fra madlisten (500 fødevarer) -->
+    <div class="preset-box">
+      <label for="searchFood">1. Søg i madlisten (500 fødevarer)</label>
+      <input type="text" id="searchFood" placeholder="Søg fx 'kylling', 'æg', 'rugbrød'..." oninput="filterFoodDropdown()">
+
+      <label for="foodSelect">2. Vælg fødevare fra listen</label>
+      <select id="foodSelect" onchange="onFoodSelected()">
+        <option value="">-- Vælg fødevare (500 på listen) --</option>
+      </select>
+
+      <div class="unit-row">
+        <div>
+          <label for="foodAmount" id="amountLabel">3. Mængde</label>
+          <input type="number" id="foodAmount" value="1" min="0.1" step="0.1" oninput="calculateFromPreset()">
+        </div>
+        <div>
+          <label for="foodUnit">4. Enhed (Stk / Gram)</label>
+          <select id="foodUnit" onchange="onUnitChanged()">
+            <option value="stk" id="unitStkOption">Stk / Portion</option>
+            <option value="g">Gram (g)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="helper-text" id="weightHelper">
+        Vælg en madvare ovenfor for automatisk udregning.
+      </div>
+    </div>
+
+    <!-- Formular der gemmer måltidet -->
     <form id="foodEntryForm">
-      <label>Madvare</label>
-      <input type="text" id="itemName" placeholder="Fx Havregryn, æg, kylling" required>
+      <label for="itemName">Madvare navn (eller skriv din egen)</label>
+      <input type="text" id="itemName" placeholder="Fx 2 stk. Æg (120g)" required>
 
       <div class="input-row">
         <div>
-          <label>Protein (g)</label>
+          <label for="itemProtein">Protein (g)</label>
           <input type="number" id="itemProtein" step="0.1" min="0" placeholder="0" required>
         </div>
         <div>
-          <label>Kulhydrat (g)</label>
+          <label for="itemCarbs">Kulhydrat (g)</label>
           <input type="number" id="itemCarbs" step="0.1" min="0" placeholder="0" required>
         </div>
         <div>
-          <label>Fedt (g)</label>
+          <label for="itemFat">Fedt (g)</label>
           <input type="number" id="itemFat" step="0.1" min="0" placeholder="0" required>
         </div>
       </div>
@@ -218,16 +271,734 @@
   </div>
 
   <script>
+    // =========================================================================
+    // 1. KOMPLET FØDEVAREDATABASE (500 FØDEVARER)
+    // Format: ["Navn", Protein_pr_100g, Kulhydrat_pr_100g, Fedt_pr_100g, Gram_pr_stk, "Enhedsnavn"]
+    // =========================================================================
+    const RAW_FOODS = {
+      "Kød & Fjerkræ": [
+        ["Kyllingebryst (rå)", 23.0, 0.0, 1.5, 150, "bryst"],
+        ["Kyllingebryst (stegt)", 29.0, 0.0, 3.0, 125, "bryst"],
+        ["Kyllingelår (stegt)", 24.0, 0.0, 11.0, 110, "stk"],
+        ["Kyllingeunderlår (drumstick)", 23.0, 0.0, 9.0, 75, "stk"],
+        ["Kyllingevinger (stegte)", 22.0, 0.0, 16.0, 45, "stk"],
+        ["Kyllingefars 3-7%", 20.0, 0.0, 5.0, 125, "portion"],
+        ["Kyllingestrimler (færdigstegte)", 25.0, 1.0, 2.5, 100, "portion"],
+        ["Kyllingekebab", 19.0, 2.0, 10.0, 100, "portion"],
+        ["Kyllingenuggets", 14.0, 16.0, 13.0, 20, "stk"],
+        ["Kyllingepølse", 13.0, 3.0, 11.0, 60, "stk"],
+        ["Kalkunbryst (rå)", 24.0, 0.0, 1.0, 150, "stk"],
+        ["Kalkunbryst (stegt)", 29.0, 0.0, 2.0, 125, "stk"],
+        ["Kalkunfars 3-7%", 21.0, 0.0, 5.0, 125, "portion"],
+        ["Kalkunbacon", 21.0, 1.0, 5.0, 15, "skive"],
+        ["Andebryst (med skind, stegt)", 19.0, 0.0, 28.0, 150, "stk"],
+        ["Andebryst (uden skind)", 25.0, 0.0, 6.0, 130, "stk"],
+        ["Hakket oksekød 3-7%", 21.5, 0.0, 5.0, 125, "bøf/portion"],
+        ["Hakket oksekød 8-12%", 19.5, 0.0, 10.0, 125, "bøf/portion"],
+        ["Hakket oksekød 14-18%", 18.0, 0.0, 16.0, 125, "bøf/portion"],
+        ["Oksemørbrad", 22.0, 0.0, 4.0, 150, "bøf"],
+        ["Oksefilet / Striploin", 21.0, 0.0, 8.0, 175, "bøf"],
+        ["Ribeye bøf", 19.0, 0.0, 18.0, 200, "bøf"],
+        ["Entrecote", 20.0, 0.0, 15.0, 180, "bøf"],
+        ["Culottesteg", 21.0, 0.0, 11.0, 75, "skive"],
+        ["Cuvette", 20.0, 0.0, 12.0, 75, "skive"],
+        ["Roastbeef (steg)", 22.0, 0.0, 5.0, 60, "skive"],
+        ["Oksebryst (braiseret)", 24.0, 0.0, 14.0, 125, "portion"],
+        ["Oksetern (gullasch)", 21.0, 0.0, 6.0, 125, "portion"],
+        ["Hakket svinekød 3-7%", 21.0, 0.0, 5.0, 125, "portion"],
+        ["Hakket svinekød 8-12%", 19.0, 0.0, 10.0, 125, "portion"],
+        ["Hakket kalv og flæsk 8-12%", 19.0, 0.0, 10.0, 125, "portion"],
+        ["Svinekotelet (rå)", 21.0, 0.0, 7.0, 150, "stk"],
+        ["Svinekotelet (stegt)", 26.0, 0.0, 10.0, 125, "stk"],
+        ["Svinemørbrad", 22.0, 0.0, 3.5, 125, "portion"],
+        ["Flæskesteg / Kamsteg", 21.0, 0.0, 18.0, 85, "skive"],
+        ["Ribbensteg", 17.0, 0.0, 28.0, 85, "skive"],
+        ["Stegt flæsk", 22.0, 0.0, 32.0, 30, "skive"],
+        ["Bacon i skiver (rå)", 14.0, 0.5, 32.0, 20, "skive"],
+        ["Bacon i skiver (stegt)", 26.0, 0.5, 38.0, 10, "skive"],
+        ["Bacon i tern (stegt)", 18.0, 0.5, 30.0, 50, "portion"],
+        ["Skinkeschnitzel (upanelet)", 22.0, 0.0, 3.0, 150, "stk"],
+        ["Wienerschnitzel (paneret, stegt)", 18.0, 10.0, 12.0, 175, "stk"],
+        ["Hamburgerryg (kogt)", 21.0, 0.5, 4.0, 75, "skive"],
+        ["Medisterpølse (stegt)", 15.0, 2.5, 23.0, 125, "stykke"],
+        ["Frikadelle (svin/kalv)", 14.0, 7.0, 15.0, 60, "stk"],
+        ["Kyllingefrikadelle", 16.0, 6.0, 8.0, 60, "stk"],
+        ["Kødboller (til suppe)", 12.0, 5.0, 14.0, 15, "stk"],
+        ["Grillpølse / Frankfurter", 12.0, 3.0, 24.0, 100, "stk"],
+        ["Rød pølse / Wienerpølse", 11.0, 4.0, 20.0, 60, "stk"],
+        ["Brunchpølse", 12.0, 2.0, 22.0, 35, "stk"],
+        ["Chorizopølse", 22.0, 2.0, 32.0, 30, "portion"],
+        ["Pepperoni", 20.0, 1.0, 38.0, 10, "skive"],
+        ["Pulled pork", 21.0, 4.0, 14.0, 125, "portion"],
+        ["Spareribs", 19.0, 6.0, 22.0, 150, "portion"],
+        ["Lammekølle (stegt)", 24.0, 0.0, 12.0, 100, "portion"],
+        ["Lammekotelet", 20.0, 0.0, 18.0, 80, "stk"],
+        ["Lammefars", 18.0, 0.0, 16.0, 125, "portion"],
+        ["Vildtkød / Dyrekølle", 23.0, 0.0, 2.5, 125, "portion"],
+        ["Kalvefilet", 22.0, 0.0, 4.0, 150, "stk"],
+        ["Kebabkød (okse/lam)", 17.0, 3.0, 18.0, 100, "portion"]
+      ],
+      "Pålæg": [
+        ["Kogt skinke (pålæg)", 18.0, 1.0, 2.5, 20, "skive"],
+        ["Røget skinke", 20.0, 0.5, 3.0, 20, "skive"],
+        ["Serranoskinke / Parmaskinke", 28.0, 0.5, 12.0, 15, "skive"],
+        ["Kyllingebryst pålæg", 21.0, 1.0, 1.5, 20, "skive"],
+        ["Kalkunbryst pålæg", 22.0, 1.0, 1.2, 20, "skive"],
+        ["Hamburgerryg pålæg", 20.0, 1.0, 3.5, 20, "skive"],
+        ["Roastbeef pålæg", 22.0, 0.5, 4.0, 20, "skive"],
+        ["Saltkød pålæg", 19.0, 0.5, 6.0, 20, "skive"],
+        ["Rullepølse", 17.0, 0.5, 18.0, 20, "skive"],
+        ["Spegepølse (almindelig)", 16.0, 1.0, 32.0, 15, "skive"],
+        ["Sønderjysk spegepølse", 15.0, 1.0, 35.0, 15, "skive"],
+        ["Kartoffelspegepølse", 14.0, 4.0, 18.0, 15, "skive"],
+        ["Kyllingespegepølse", 18.0, 1.5, 12.0, 15, "skive"],
+        ["Salami", 20.0, 1.0, 34.0, 12, "skive"],
+        ["Kødpølse", 12.0, 4.0, 18.0, 20, "skive"],
+        ["Jagtpølse", 13.0, 3.0, 20.0, 20, "skive"],
+        ["Mortadella", 13.0, 1.5, 25.0, 20, "skive"],
+        ["Leverpostej (klassisk)", 10.0, 6.0, 21.0, 30, "portion"],
+        ["Leverpostej (mager/fedtfattig)", 12.0, 9.0, 7.0, 30, "portion"],
+        ["Kyllingeleverpostej", 13.0, 6.0, 9.0, 30, "portion"],
+        ["Paté (fransk)", 11.0, 3.0, 28.0, 30, "portion"],
+        ["Hønsesalat", 8.0, 4.0, 28.0, 35, "portion"],
+        ["Skinkesalat", 7.0, 5.0, 26.0, 35, "portion"],
+        ["Æggesalat", 6.0, 4.0, 25.0, 35, "portion"],
+        ["Tunsalat", 11.0, 3.0, 22.0, 35, "portion"],
+        ["Makrelsalat", 8.0, 5.0, 24.0, 35, "portion"],
+        ["Rejesalat", 6.0, 5.0, 25.0, 35, "portion"],
+        ["Krabbesalat", 5.0, 8.0, 22.0, 35, "portion"],
+        ["Italiensk salat", 1.5, 8.0, 22.0, 30, "portion"],
+        ["Russisk salat", 1.5, 9.0, 20.0, 30, "portion"],
+        ["Kartoffelsalat (færdigkøbt)", 1.5, 13.0, 14.0, 100, "portion"],
+        ["Pålægschokolade (lys)", 6.0, 58.0, 30.0, 8, "plade"],
+        ["Pålægschokolade (mørk)", 5.0, 52.0, 34.0, 8, "plade"],
+        ["Nutella / Nøddecreme", 6.0, 57.0, 31.0, 15, "spsk"],
+        ["jordbærmarmelade", 0.4, 48.0, 0.1, 20, "spsk"],
+        ["Hindbærmarmelade", 0.6, 46.0, 0.2, 20, "spsk"],
+        ["Honning", 0.3, 82.0, 0.0, 20, "spsk"],
+        ["Sirup (ahorn/lys)", 0.0, 68.0, 0.0, 20, "spsk"],
+        ["Bananmos / Pålæg", 1.1, 21.0, 0.2, 50, "portion"],
+        ["Syltede rødbeder", 1.0, 10.0, 0.1, 30, "portion"]
+      ],
+      "Fisk & Skaldyr": [
+        ["Laks (rå filet)", 20.0, 0.0, 14.0, 125, "filet"],
+        ["Laks (ovnbagt/stegt)", 23.0, 0.0, 15.0, 125, "filet"],
+        ["Røget laks", 21.0, 0.0, 10.0, 50, "portion"],
+        ["Varmrøget laks", 23.0, 0.0, 14.0, 100, "portion"],
+        ["Gravad laks", 20.0, 2.0, 12.0, 50, "portion"],
+        ["Torskefilet (rå/kogt)", 18.0, 0.0, 0.7, 150, "filet"],
+        ["Torskefilet (paneret, stegt)", 15.0, 9.0, 10.0, 150, "filet"],
+        ["Torskerogn (dåse)", 19.0, 1.5, 2.5, 50, "skive"],
+        ["Tun i vand (drænet)", 25.0, 0.0, 1.0, 100, "dåse"],
+        ["Tun i olie (drænet)", 26.0, 0.0, 10.0, 100, "dåse"],
+        ["Tunbøf (frisk)", 24.0, 0.0, 1.5, 150, "bøf"],
+        ["Makrel i tomat (dåse)", 14.0, 3.5, 15.0, 125, "dåse"],
+        ["Røget makrel", 19.0, 0.0, 22.0, 100, "filet"],
+        ["Sild (marinerede)", 14.0, 12.0, 15.0, 75, "portion"],
+        ["Karrysild", 11.0, 10.0, 22.0, 75, "portion"],
+        ["Kryddersild", 14.0, 10.0, 16.0, 75, "portion"],
+        ["Rødspættefilet (rå)", 17.0, 0.0, 1.2, 100, "filet"],
+        ["Fiskefilet (paneret, stegt)", 13.0, 14.0, 13.0, 110, "stk"],
+        ["Fiskefrikadelle", 12.0, 9.0, 8.0, 65, "stk"],
+        ["Fiskepinde", 12.0, 18.0, 9.0, 30, "stk"],
+        ["Sejfilet (mørksej)", 19.0, 0.0, 0.9, 150, "filet"],
+        ["Helleflynder", 20.0, 0.0, 11.0, 140, "filet"],
+        ["Ørred / Forel", 20.0, 0.0, 7.0, 140, "filet"],
+        ["Ål (røget)", 18.0, 0.0, 28.0, 60, "portion"],
+        ["Rejer (kogte, pillede)", 18.0, 0.0, 1.0, 75, "portion"],
+        ["Tigerrejer / Kongerejer", 19.0, 0.0, 1.2, 100, "portion"],
+        ["Blåmuslinger (kogte)", 17.0, 3.0, 2.0, 100, "portion"],
+        ["Kammuslinger", 16.0, 3.0, 0.8, 30, "stk"],
+        ["Krebs / Jomfruhummer", 18.0, 0.5, 1.0, 100, "portion"],
+        ["Blæksprutteringe (panerede)", 10.0, 20.0, 12.0, 100, "portion"],
+        ["Kaviar / Stenbiderrogn", 16.0, 1.0, 6.0, 30, "portion"],
+        ["Surimi / Crabsticks", 8.0, 12.0, 1.0, 20, "stk"],
+        ["Ansjoser (i olie)", 24.0, 0.0, 10.0, 15, "portion"],
+        ["Sardiner i olie", 22.0, 0.0, 12.0, 90, "dåse"],
+        ["Kullerfilet", 18.0, 0.0, 0.6, 150, "filet"]
+      ],
+      "Mejeri & Æg": [
+        ["Æg (helt, M/L)", 12.5, 1.0, 10.0, 60, "stk"],
+        ["Æggehvide", 11.0, 0.7, 0.0, 35, "stk"],
+        ["Æggeblomme", 16.0, 0.5, 31.0, 20, "stk"],
+        ["Røræg (med lidt mælk)", 10.5, 1.5, 11.0, 120, "portion"],
+        ["Spejlæg (stegt)", 13.0, 1.0, 14.0, 60, "stk"],
+        ["Skummetmælk (0.1%)", 3.5, 4.8, 0.1, 200, "glas"],
+        ["Minimælk (0.4%)", 3.5, 4.8, 0.4, 200, "glas"],
+        ["Letmælk (1.5%)", 3.5, 4.7, 1.5, 200, "glas"],
+        ["Sødmælk (3.5%)", 3.4, 4.6, 3.5, 200, "glas"],
+        ["Kærnemælk", 3.5, 4.0, 0.5, 200, "glas"],
+        ["Kakaoskummetmælk", 3.5, 10.0, 0.4, 250, "glas"],
+        ["Mathilde Kakaomælk", 3.4, 10.5, 1.5, 250, "glas"],
+        ["Havredrik (Oatly)", 1.0, 6.7, 1.5, 200, "glas"],
+        ["Soyadrik (naturel)", 3.3, 0.5, 1.8, 200, "glas"],
+        ["Mandeldrik (usødet)", 0.5, 0.2, 1.1, 200, "glas"],
+        ["Skyr Naturel (0.2%)", 11.0, 3.5, 0.2, 150, "portion"],
+        ["Skyr Vanilje", 10.0, 5.5, 0.2, 150, "portion"],
+        ["Skyr Skovbær / Jordbær", 9.5, 6.0, 0.2, 150, "portion"],
+        ["Græsk Yoghurt 2%", 9.0, 4.0, 2.0, 150, "portion"],
+        ["Græsk Yoghurt 10%", 5.5, 3.5, 10.0, 150, "portion"],
+        ["Cheasy Yoghurt 0.1% (diverse)", 4.5, 5.0, 0.1, 200, "portion"],
+        ["Yoghurt Naturel (1.5%)", 4.0, 4.5, 1.5, 200, "portion"],
+        ["Pæreyoghurt / Frugtyoghurt", 3.5, 12.0, 1.5, 200, "portion"],
+        ["Ylette", 6.5, 4.0, 1.5, 200, "portion"],
+        ["Ymer (3.5%)", 6.3, 3.8, 3.5, 200, "portion"],
+        ["A38 (1.5%)", 4.2, 4.2, 1.5, 200, "portion"],
+        ["Koldskål (købt)", 3.2, 12.0, 2.5, 250, "portion"],
+        ["Kvark (mager)", 12.0, 4.0, 0.3, 150, "portion"],
+        ["Hytteost 4%", 12.0, 2.5, 4.0, 100, "portion"],
+        ["Hytteost 1.5%", 13.0, 2.5, 1.5, 100, "portion"],
+        ["Fromage Frais", 8.0, 4.0, 0.2, 100, "portion"],
+        ["Creme Fraiche 9%", 3.2, 3.5, 9.0, 30, "spsk"],
+        ["Creme Fraiche 18%", 2.8, 3.0, 18.0, 30, "spsk"],
+        ["Creme Fraiche 38%", 2.1, 2.3, 38.0, 30, "spsk"],
+        ["Madlavningsfløde 4%", 3.2, 4.5, 4.0, 100, "dl"],
+        ["Madlavningsfløde 8%", 3.0, 4.5, 8.0, 100, "dl"],
+        ["Madlavningsfløde 18%", 2.6, 3.5, 18.0, 100, "dl"],
+        ["Piskefløde 38%", 2.0, 3.0, 38.0, 100, "dl"],
+        ["Kaffefløde 9%", 3.0, 4.2, 9.0, 20, "spsk"],
+        ["Kokosmælk (almindelig)", 1.8, 3.0, 18.0, 100, "dl"],
+        ["Kokosmælk (light)", 0.8, 1.5, 6.0, 100, "dl"],
+        ["Smør (Lurpak)", 0.6, 0.7, 82.0, 10, "knivspids/tsk"],
+        ["Kærgården (original)", 0.5, 0.6, 72.0, 10, "knivspids/tsk"],
+        ["Kærgården (let)", 0.5, 1.0, 40.0, 10, "knivspids/tsk"],
+        ["Plantemargarine / Bakkedal", 0.4, 0.5, 70.0, 10, "tsk"],
+        ["Skæreost 45+ (26% fedt)", 25.0, 0.0, 26.0, 20, "skive"],
+        ["Skæreost 30+ (17% fedt)", 28.0, 0.0, 17.0, 20, "skive"],
+        ["Skæreost 20+ (11% fedt)", 31.0, 0.0, 11.0, 20, "skive"],
+        ["Vesterhavsost / Lagret ost", 26.0, 0.0, 32.0, 20, "skive"],
+        ["Cheddarost", 25.0, 0.5, 33.0, 20, "skive"],
+        ["Mozzarella (frisk kugle)", 18.0, 1.0, 17.0, 125, "kugle"],
+        ["Revet mozzarella (pizzaost)", 24.0, 2.0, 22.0, 50, "portion"],
+        ["Parmesan (revet)", 36.0, 0.0, 28.0, 15, "spsk"],
+        ["Fetaost / Salatost 40+", 15.0, 1.5, 21.0, 40, "portion"],
+        ["Fetaost / Salatost 30% (light)", 17.0, 2.0, 10.0, 40, "portion"],
+        ["Brie 45+", 19.0, 0.5, 24.0, 30, "stykke"],
+        ["Camembert", 20.0, 0.5, 22.0, 30, "stykke"],
+        ["Blåskimmelost / Danablu", 20.0, 0.5, 29.0, 25, "stykke"],
+        ["Flødeost (Philadelphia orig.)", 5.5, 4.0, 22.0, 20, "portion"],
+        ["Flødeost Light (Philadelphia)", 7.5, 5.0, 11.0, 20, "portion"],
+        ["Buko Smøreost (Reje/Skinke)", 12.0, 3.0, 16.0, 20, "portion"],
+        ["Ricotta", 9.0, 3.5, 11.0, 50, "portion"],
+        ["Mascarpone", 4.5, 3.5, 42.0, 50, "portion"],
+        ["Halloumi (grillost)", 22.0, 2.0, 25.0, 75, "portion"],
+        ["Babybel ost", 23.0, 0.0, 24.0, 20, "stk"]
+      ],
+      "Brød, Korn, Ris & Pasta": [
+        ["Havregryn (fin/grov)", 13.0, 60.0, 7.0, 40, "dl"],
+        ["Rugbrød (solsikke/kerner)", 6.5, 40.0, 4.0, 50, "skive"],
+        ["Rugbrød (mørkt/uden kerner)", 5.5, 43.0, 1.5, 50, "skive"],
+        ["Rugbrød (gulerod)", 6.0, 41.0, 3.0, 50, "skive"],
+        ["Toastbrød (hvidt)", 8.5, 50.0, 3.0, 30, "skive"],
+        ["Fuldkornstoast", 9.5, 44.0, 3.5, 35, "skive"],
+        ["Franskbrød", 8.5, 51.0, 3.0, 40, "skive"],
+        ["Surdejsbrød", 9.0, 48.0, 1.5, 50, "skive"],
+        ["Hvedebolle / Fødselsdagsbolle", 9.0, 50.0, 5.0, 60, "stk"],
+        ["Grovbolle / Fuldkornsbolle", 9.5, 44.0, 4.5, 70, "stk"],
+        ["Gulerodsbolle", 8.5, 45.0, 4.5, 70, "stk"],
+        ["Krydderbolle", 9.0, 52.0, 4.0, 50, "stk"],
+        ["Rundstykke (hvidt)", 9.5, 54.0, 3.5, 55, "stk"],
+        ["Håndværker (med birkes)", 10.0, 50.0, 6.0, 55, "stk"],
+        ["Baguette / Flute", 9.0, 55.0, 1.5, 60, "stykke"],
+        ["Hvidløgsflute", 7.5, 44.0, 16.0, 60, "stykke"],
+        ["Ciabattabolle", 9.5, 51.0, 3.0, 80, "stk"],
+        ["Focaccia", 8.0, 46.0, 9.0, 80, "stykke"],
+        ["Pitabrød (hvidt)", 9.0, 55.0, 1.5, 75, "stk"],
+        ["Pitabrød (fuldkorn)", 9.5, 49.0, 2.0, 75, "stk"],
+        ["Tortilla wrap (almindelig)", 8.0, 52.0, 6.5, 62, "stk"],
+        ["Tortilla wrap (fuldkorn)", 8.5, 46.0, 6.0, 62, "stk"],
+        ["Burgerbolle (almindelig)", 8.5, 50.0, 4.5, 60, "stk"],
+        ["Brioche burgerbolle", 8.0, 49.0, 8.5, 65, "stk"],
+        ["Pølsebrød", 8.5, 51.0, 4.5, 40, "stk"],
+        ["Tacoskaller", 6.5, 62.0, 21.0, 13, "stk"],
+        ["Naanbrød", 8.5, 52.0, 6.0, 100, "stk"],
+        ["Knækbrød (Wasa Husman)", 9.0, 62.0, 1.5, 13, "skive"],
+        ["Knækbrød (Wasa Sport)", 9.5, 60.0, 1.5, 15, "skive"],
+        ["Hjemmebagt kerneknækbrød", 14.0, 35.0, 28.0, 25, "stykke"],
+        ["Riskiks (naturel)", 8.0, 81.0, 2.8, 9, "stk"],
+        ["Riskiks med chokolade", 6.5, 68.0, 16.0, 17, "stk"],
+        ["Tvebakker", 10.0, 72.0, 5.0, 12, "stk"],
+        ["Croissant", 8.0, 42.0, 21.0, 60, "stk"],
+        ["Cornflakes", 7.5, 84.0, 0.9, 30, "portion"],
+        ["Havrefras", 10.0, 66.0, 5.0, 35, "portion"],
+        ["Cheerios (Havre)", 9.0, 72.0, 4.0, 35, "portion"],
+        ["Musli (uden tilsat sukker)", 11.0, 60.0, 8.0, 50, "portion"],
+        ["Granola / Crunch musli", 8.5, 65.0, 15.0, 50, "portion"],
+        ["All-Bran Regular", 14.0, 48.0, 3.5, 40, "portion"],
+        ["Coco Pops / Choko morgenmad", 5.5, 84.0, 2.0, 35, "portion"],
+        ["Guldkorn", 6.0, 83.0, 2.0, 35, "portion"],
+        ["Rugfras", 9.0, 68.0, 2.5, 35, "portion"],
+        ["Chiafrø", 21.0, 7.0, 31.0, 15, "spsk"],
+        ["Hørfrø", 19.0, 2.0, 34.0, 15, "spsk"],
+        ["Solsikkekerner", 21.0, 12.0, 51.0, 15, "spsk"],
+        ["Græskarkerner", 29.0, 11.0, 49.0, 15, "spsk"],
+        ["Sesamfrø", 18.0, 10.0, 50.0, 10, "spsk"],
+        ["Ris, hvide / Basmati (rå)", 7.5, 78.0, 0.8, 75, "portion"],
+        ["Ris, hvide / Basmati (kogt)", 2.8, 28.0, 0.3, 175, "portion"],
+        ["Brune ris / Fuldkornsris (rå)", 8.0, 74.0, 2.5, 75, "portion"],
+        ["Brune ris / Fuldkornsris (kogt)", 3.0, 26.0, 0.9, 175, "portion"],
+        ["Jasminris (kogt)", 2.7, 28.0, 0.3, 175, "portion"],
+        ["Sushiris (kogt)", 2.5, 30.0, 0.2, 150, "portion"],
+        ["Pasta / Spaghetti (rå)", 12.0, 72.0, 1.5, 80, "portion"],
+        ["Pasta / Spaghetti (kogt)", 5.0, 30.0, 0.7, 200, "portion"],
+        ["Fuldkornspasta (rå)", 13.0, 66.0, 2.5, 80, "portion"],
+        ["Fuldkornspasta (kogt)", 5.5, 27.0, 1.0, 200, "portion"],
+        ["Frisk pasta (rå)", 11.0, 55.0, 2.5, 125, "portion"],
+        ["Tortellini med ost/skinke (kogt)", 9.0, 32.0, 6.0, 200, "portion"],
+        ["Lasagneplader (rå)", 12.0, 72.0, 1.5, 20, "plade"],
+        ["Æggenudler (rå)", 13.0, 70.0, 3.0, 75, "portion"],
+        ["Æggenudler (kogte)", 4.5, 25.0, 1.0, 180, "portion"],
+        ["Risnudler (kogte)", 1.5, 25.0, 0.2, 180, "portion"],
+        ["Couscous (rå)", 12.0, 72.0, 1.5, 75, "portion"],
+        ["Couscous (tilberedt)", 4.5, 26.0, 0.6, 175, "portion"],
+        ["Bulgur (kogt)", 3.5, 21.0, 0.4, 175, "portion"],
+        ["Quinoa (kogt)", 4.4, 21.0, 1.9, 175, "portion"],
+        ["Perlebyg / Perlespelt (kogt)", 3.5, 25.0, 0.7, 175, "portion"],
+        ["Gnocchi", 5.0, 35.0, 1.0, 200, "portion"]
+      ],
+      "Kartofler, Grøntsager & Bælgfrugter": [
+        ["Kartofler (rå/kogte)", 2.0, 17.0, 0.1, 70, "stk"],
+        ["Bagekartoffel", 2.0, 17.0, 0.1, 250, "stk"],
+        ["Søde kartofler (Sweet potato)", 1.6, 20.0, 0.1, 150, "stk"],
+        ["Kartoffelmos (hjemmelavet)", 2.2, 14.0, 3.5, 200, "portion"],
+        ["Pommes frites (ovn)", 3.0, 26.0, 5.5, 150, "portion"],
+        ["Pommes frites (friture)", 3.5, 34.0, 15.0, 150, "portion"],
+        ["Kartoffelbåde (ovn)", 2.5, 21.0, 4.0, 150, "portion"],
+        ["Flødekartofler", 3.5, 13.0, 10.0, 200, "portion"],
+        ["Broccoli", 3.5, 3.0, 0.5, 100, "portion"],
+        ["Blomkål", 2.0, 3.0, 0.3, 100, "portion"],
+        ["Blomkålsris", 2.0, 3.0, 0.3, 150, "portion"],
+        ["Gulerod", 0.7, 7.0, 0.2, 75, "stk"],
+        ["Agurk", 0.7, 2.0, 0.1, 50, "stykke"],
+        ["Tomat (almindelig)", 0.8, 3.0, 0.2, 85, "stk"],
+        ["Cherrytomater", 0.9, 3.5, 0.2, 15, "stk"],
+        ["Hakkede tomater (dåse)", 1.2, 4.0, 0.2, 400, "dåse"],
+        ["Tomatpuré", 4.5, 18.0, 0.5, 30, "spsk"],
+        ["Rød peberfrugt", 1.0, 5.0, 0.3, 120, "stk"],
+        ["Grøn peberfrugt", 0.9, 3.0, 0.2, 120, "stk"],
+        ["Icebergsalat", 0.9, 2.0, 0.1, 50, "portion"],
+        ["Hjertesalat / Romainesalat", 1.2, 2.0, 0.2, 50, "portion"],
+        ["Rucola", 2.5, 2.0, 0.7, 30, "håndfuld"],
+        ["Frisk spinat", 2.9, 1.5, 0.4, 50, "håndfuld"],
+        ["Grønkål", 4.3, 4.5, 0.9, 50, "håndfuld"],
+        ["Hvidkål", 1.3, 4.5, 0.2, 100, "portion"],
+        ["Spidskål", 1.5, 4.0, 0.2, 100, "portion"],
+        ["Rødkål (rå)", 1.4, 5.0, 0.2, 100, "portion"],
+        ["Rødkål (syltet på glas)", 1.0, 14.0, 0.1, 75, "portion"],
+        ["Rosenkål", 3.4, 5.0, 0.3, 100, "portion"],
+        ["Squash / Courgette", 1.2, 2.5, 0.2, 100, "portion"],
+        ["Aubergine", 1.0, 3.5, 0.2, 100, "portion"],
+        ["Champignon / Svampe", 3.1, 1.0, 0.3, 100, "portion"],
+        ["Løg (zittauer)", 1.2, 8.0, 0.1, 80, "stk"],
+        ["Rødløg", 1.2, 8.0, 0.1, 80, "stk"],
+        ["Forårsløg", 1.8, 5.0, 0.2, 20, "stk"],
+        ["Porre", 1.5, 6.0, 0.3, 100, "stk"],
+        ["Hvidløg", 6.0, 28.0, 0.5, 5, "fed"],
+        ["Grønne bønner (haricots verts)", 1.9, 4.5, 0.2, 100, "portion"],
+        ["Grønne ærter (frosne/friske)", 5.5, 10.0, 0.4, 75, "portion"],
+        ["Sukkerærter / Slikærter", 3.0, 7.0, 0.2, 50, "portion"],
+        ["Edamamebønner (uden bælg)", 11.0, 7.0, 5.0, 75, "portion"],
+        ["Majs (dåse/frosne)", 3.0, 16.0, 1.2, 75, "portion"],
+        ["Majskolbe", 3.2, 18.0, 1.2, 150, "stk"],
+        ["Asparges (grønne)", 2.2, 2.0, 0.2, 80, "portion"],
+        ["Knoldselleri", 1.5, 5.0, 0.3, 100, "portion"],
+        ["Bladselleri", 0.7, 1.5, 0.2, 40, "stængel"],
+        ["Pastinak / Persillerod", 1.3, 12.0, 0.3, 100, "stk"],
+        ["Rødbede (rå/kogt)", 1.6, 8.5, 0.2, 100, "stk"],
+        ["Fennikel", 1.2, 4.0, 0.2, 100, "portion"],
+        ["Radiser", 0.7, 2.0, 0.1, 15, "stk"],
+        ["Avocado", 2.0, 2.0, 15.0, 120, "stk"],
+        ["Kikærter (kogte/dåse)", 8.5, 20.0, 2.5, 100, "portion"],
+        ["Kidneybønner (kogte/dåse)", 8.5, 17.0, 0.6, 100, "portion"],
+        ["Sorte bønner (kogte/dåse)", 8.8, 18.0, 0.6, 100, "portion"],
+        ["Hvide bønner / Butterbeans", 7.5, 16.0, 0.6, 100, "portion"],
+        ["Baked beans i tomatsauce", 4.8, 15.0, 0.5, 150, "portion"],
+        ["Røde linser (rå)", 25.0, 53.0, 1.5, 60, "portion"],
+        ["Røde/grønne linser (kogte)", 9.0, 18.0, 0.5, 125, "portion"],
+        ["Tofu (fast, naturel)", 12.0, 1.5, 6.0, 100, "portion"],
+        ["Falafel", 8.0, 25.0, 14.0, 30, "stk"]
+      ],
+      "Frugt & Bær": [
+        ["Banan", 1.1, 21.0, 0.2, 105, "stk"],
+        ["Æble", 0.3, 12.0, 0.2, 130, "stk"],
+        ["Pære", 0.4, 12.0, 0.2, 140, "stk"],
+        ["Appelsin", 0.8, 9.0, 0.1, 150, "stk"],
+        ["Klementin / Mandarin", 0.7, 9.0, 0.2, 65, "stk"],
+        ["Grapefrugt", 0.7, 8.0, 0.1, 180, "halv"],
+        ["Citron / Lime", 0.8, 3.0, 0.2, 50, "stk"],
+        ["Kiwi", 1.1, 11.0, 0.5, 70, "stk"],
+        ["Fersken / Nektarin", 0.9, 9.0, 0.1, 110, "stk"],
+        ["Blomme", 0.7, 10.0, 0.2, 55, "stk"],
+        ["Abrikos (frisk)", 1.0, 9.0, 0.1, 40, "stk"],
+        ["Vindruer (grønne/røde)", 0.6, 16.0, 0.2, 100, "klase/håndfuld"],
+        ["Jordbær", 0.7, 6.5, 0.4, 100, "portion"],
+        ["Hindbær", 1.2, 5.5, 0.6, 100, "portion"],
+        ["Blåbær", 0.7, 10.0, 0.5, 100, "portion"],
+        ["Brombær", 1.3, 6.0, 0.5, 100, "portion"],
+        ["Melon (Vandmelon)", 0.6, 7.5, 0.2, 150, "skive"],
+        ["Melon (Honningmelon/Galia)", 0.8, 8.0, 0.2, 150, "skive"],
+        ["Ananas (frisk)", 0.5, 12.0, 0.1, 100, "portion"],
+        ["Mango", 0.8, 14.0, 0.4, 150, "portion"],
+        ["Granatæblekerner", 1.5, 14.0, 1.0, 75, "portion"],
+        ["Passionsfrugt", 2.2, 11.0, 0.7, 30, "stk"],
+        ["Kirsebær", 1.0, 13.0, 0.3, 100, "håndfuld"],
+        ["Rosiner", 3.0, 70.0, 0.5, 30, "håndfuld/æske"],
+        ["Dadler (tørrede / Medjool)", 2.0, 68.0, 0.4, 20, "stk"],
+        ["Tørrede abrikoser", 3.0, 55.0, 0.5, 30, "portion"],
+        ["Tørrede figner", 3.3, 54.0, 1.0, 25, "stk"],
+        ["Svesker", 2.2, 55.0, 0.4, 30, "portion"],
+        ["Tørrede tranebær", 0.2, 75.0, 1.0, 30, "håndfuld"],
+        ["Kokosmel (tørret)", 6.5, 7.5, 65.0, 15, "spsk"]
+      ],
+      "Nødder, Fedtstoffer, Dressinger & Saucer": [
+        ["Mandler", 21.0, 8.0, 52.0, 25, "håndfuld"],
+        ["Valnødder", 14.0, 7.0, 65.0, 25, "håndfuld"],
+        ["Hasselnødder", 15.0, 6.0, 62.0, 25, "håndfuld"],
+        ["Cashewnødder", 18.0, 26.0, 44.0, 25, "håndfuld"],
+        ["Peanuts (saltede/ristede)", 25.0, 12.0, 50.0, 30, "håndfuld"],
+        ["Pistacienødder", 20.0, 18.0, 45.0, 25, "håndfuld"],
+        ["Pekannødder", 9.0, 4.0, 72.0, 25, "håndfuld"],
+        ["Paranødder", 14.0, 4.0, 66.0, 25, "håndfuld"],
+        ["Pinjekerner", 14.0, 13.0, 68.0, 15, "spsk"],
+        ["Peanutbutter (cremet/crunchy)", 25.0, 14.0, 50.0, 20, "spsk"],
+        ["Mandelsmør", 21.0, 10.0, 55.0, 20, "spsk"],
+        ["Tahin (sesampasta)", 18.0, 12.0, 54.0, 20, "spsk"],
+        ["Olivenolie", 0.0, 0.0, 100.0, 10, "spsk"],
+        ["Rapsolie / Solsikkeolie", 0.0, 0.0, 100.0, 10, "spsk"],
+        ["Kokosolie", 0.0, 0.0, 100.0, 10, "spsk"],
+        ["Mayonnaise (ægte)", 1.0, 1.5, 78.0, 15, "spsk"],
+        ["Mayonnaise (let / light)", 0.7, 5.5, 28.0, 15, "spsk"],
+        ["Remoulade (almindelig)", 1.0, 12.0, 35.0, 15, "spsk"],
+        ["Remoulade (let)", 0.8, 14.0, 14.0, 15, "spsk"],
+        ["Ketchup (Heinz)", 1.2, 23.0, 0.1, 15, "spsk"],
+        ["Ketchup (uden tilsat sukker)", 1.2, 7.0, 0.1, 15, "spsk"],
+        ["Sennep (almindelig)", 4.5, 10.0, 4.0, 10, "tsk"],
+        ["Dijonsennep", 7.0, 5.0, 11.0, 10, "tsk"],
+        ["Sød fransk sennep", 3.5, 22.0, 5.0, 15, "spsk"],
+        ["Chilimayonnaise", 1.0, 5.0, 55.0, 15, "spsk"],
+        ["Aioli / Hvidløgsmayonnaise", 1.0, 3.0, 65.0, 15, "spsk"],
+        ["Tusind Øer dressing", 1.0, 12.0, 22.0, 20, "spsk"],
+        ["Cæsardressing", 2.5, 4.0, 38.0, 20, "spsk"],
+        ["Creme fraiche dressing", 1.5, 7.0, 18.0, 20, "spsk"],
+        ["Pesto (grøn basilikum)", 4.5, 4.0, 45.0, 20, "spsk"],
+        ["Pesto (rød tomat)", 3.5, 8.0, 35.0, 20, "spsk"],
+        ["Hummus", 7.0, 14.0, 18.0, 30, "spsk"],
+        ["Guacamole", 1.8, 4.0, 14.0, 40, "portion"],
+        ["Tzatziki", 3.5, 3.5, 7.0, 40, "portion"],
+        ["Salsa (tomat)", 1.2, 7.0, 0.2, 40, "portion"],
+        ["Bearnaisesauce (færdig/pulver+smør)", 2.0, 4.0, 35.0, 75, "portion"],
+        ["Bearnaisesauce (let)", 2.0, 6.0, 8.0, 75, "portion"],
+        ["Brun sovs (jævnet)", 2.5, 6.0, 5.0, 100, "portion"],
+        ["Whiskysauce / Jensens", 1.5, 8.0, 14.0, 75, "portion"],
+        ["Hollandaisesauce", 2.0, 4.0, 32.0, 75, "portion"],
+        ["Karrysauce", 2.0, 7.0, 6.0, 100, "portion"],
+        ["Persillesovs", 3.0, 6.0, 4.5, 100, "portion"],
+        ["Sojasauce", 8.0, 6.0, 0.1, 15, "spsk"],
+        ["Sød chilisauce", 0.5, 50.0, 0.2, 20, "spsk"],
+        ["BBQ sauce", 1.0, 38.0, 0.3, 20, "spsk"],
+        ["Oliven (grønne/sorte)", 1.0, 2.0, 14.0, 30, "portion"]
+      ],
+      "Færdigretter, Fastfood & Danske Retter": [
+        ["Spaghetti Bolognese (komplet ret)", 8.0, 16.0, 5.0, 350, "portion"],
+        ["Lasagne (oksekød)", 8.5, 13.0, 7.5, 350, "portion"],
+        ["Chili con carne (uden ris)", 10.0, 8.0, 5.0, 300, "portion"],
+        ["Boller i karry (med ris)", 6.5, 18.0, 5.5, 350, "portion"],
+        ["Millionbøf (uden mos/pasta)", 11.0, 4.0, 7.0, 200, "portion"],
+        ["Brændende kærlighed", 5.5, 14.0, 7.0, 350, "portion"],
+        ["Mørbradgryde (uden ris)", 11.0, 4.0, 9.0, 250, "portion"],
+        ["Biksemad (med kød og kartoffel)", 7.5, 13.0, 8.0, 300, "portion"],
+        ["Tartelet med høns i asparges", 6.5, 11.0, 9.5, 95, "stk"],
+        ["Stjerneskud", 11.0, 12.0, 12.0, 350, "stk"],
+        ["Pariserbøf", 14.0, 12.0, 14.0, 280, "stk"],
+        ["Æggekage (med bacon)", 11.0, 2.0, 13.0, 250, "portion"],
+        ["Pandekage (tynd dessert)", 6.0, 28.0, 8.0, 65, "stk"],
+        ["Amerikansk pandekage", 6.5, 34.0, 7.0, 50, "stk"],
+        ["Vaffel", 6.5, 36.0, 14.0, 75, "stk"],
+        ["Havregrød (kogt på vand)", 2.2, 10.0, 1.2, 250, "portion"],
+        ["Havregrød (kogt på mælk)", 4.5, 12.0, 2.2, 250, "portion"],
+        ["Risengrød", 3.2, 16.0, 2.5, 300, "portion"],
+        ["Tomatsuppe", 1.5, 7.0, 2.0, 300, "portion"],
+        ["Hønsekødssuppe (med boller)", 3.5, 4.5, 2.5, 350, "portion"],
+        ["Kartoffel-porresuppe", 2.0, 8.0, 3.5, 300, "portion"],
+        ["Karrysuppe med kylling", 5.0, 6.0, 4.5, 350, "portion"],
+        ["Minestronesuppe", 2.5, 8.0, 1.5, 350, "portion"],
+        ["Pizza Margherita (frysepizza/bager)", 10.0, 30.0, 8.5, 350, "pizza"],
+        ["Pizza Pepperoni", 11.0, 28.0, 12.0, 400, "pizza"],
+        ["Pizza med skinke og svampe", 11.0, 27.0, 9.0, 400, "pizza"],
+        ["Kebabrulle / Durum", 10.0, 22.0, 9.5, 400, "stk"],
+        ["Pitabrød med kebab og salat", 9.5, 20.0, 7.5, 300, "stk"],
+        ["Cheeseburger (fastfood)", 13.0, 25.0, 11.0, 120, "stk"],
+        ["Big Mac / Stor burger", 12.0, 20.0, 11.5, 220, "stk"],
+        ["Hjemmelavet burger (komplet)", 13.0, 18.0, 12.0, 280, "stk"],
+        ["Ristet hotdog (komplet)", 10.0, 22.0, 15.0, 150, "stk"],
+        ["Fransk hotdog", 10.0, 25.0, 14.0, 140, "stk"],
+        ["Pølsehorn", 10.0, 28.0, 13.0, 75, "stk"],
+        ["Pizzasnegl", 10.0, 32.0, 9.0, 80, "stk"],
+        ["Forårsrulle (stor, Daloon)", 7.0, 21.0, 9.0, 130, "stk"],
+        ["Miniforårsruller", 5.5, 26.0, 11.0, 20, "stk"],
+        ["Sushi Nigiri (laks)", 7.5, 24.0, 3.5, 35, "stk"],
+        ["Sushi Maki / California roll", 5.5, 22.0, 3.0, 25, "stk"],
+        ["Poké Bowl (med laks og ris)", 8.5, 18.0, 5.5, 350, "portion"],
+        ["Pastasalat med kylling og bacon", 8.5, 16.0, 9.0, 300, "portion"],
+        ["Cæsarsalat med kylling", 10.0, 5.0, 8.5, 250, "portion"],
+        ["Tærte med skinke og porre", 9.0, 16.0, 13.0, 150, "stykke"],
+        ["Toast (Parisertoast med skinke/ost)", 13.0, 28.0, 11.0, 120, "stk"],
+        ["Nachos med ost og kylling", 12.0, 32.0, 18.0, 250, "portion"]
+      ],
+      "Kosttilskud & Træning": [
+        ["Proteinpulver (Whey 80)", 78.0, 6.0, 6.0, 30, "scoop"],
+        ["Proteinpulver (Whey Isolate)", 86.0, 2.0, 1.5, 30, "scoop"],
+        ["Vegansk proteinpulver", 75.0, 7.0, 5.0, 30, "scoop"],
+        ["Clear Whey Isolate", 82.0, 3.0, 0.5, 25, "scoop"],
+        ["Weight Gainer pulver", 22.0, 68.0, 3.5, 100, "scoop"],
+        ["Proteinbar (Barebells / 55g)", 36.0, 31.0, 14.0, 55, "bar"],
+        ["Proteinbar (Bodylab / 60g)", 33.0, 34.0, 15.0, 60, "bar"],
+        ["Proteinbudding (Arla / Ehrmann)", 10.0, 4.5, 1.5, 200, "bæger"],
+        ["Proteindrik (Arla Protein / 500ml)", 5.2, 4.8, 0.2, 500, "flaske"],
+        ["Proteindrik (Barebells Milkshake)", 7.3, 4.5, 1.4, 330, "flaske"],
+        ["Riskiks med peanutbutter", 12.0, 50.0, 18.0, 25, "stk"],
+        ["Energibar / Havrebars (Flapjack)", 6.5, 58.0, 18.0, 60, "bar"],
+        ["Druesukker / Dextrose", 0.0, 91.0, 0.0, 10, "stk/spsk"],
+        ["Maltodextrin", 0.0, 95.0, 0.0, 30, "scoop"],
+        ["Elektrolyt / Sportsdrik (pulver)", 0.0, 88.0, 0.0, 20, "scoop"]
+      ],
+      "Snacks, Kage, Slik & Is": [
+        ["Mørk chokolade 70%", 8.0, 35.0, 42.0, 20, "række"],
+        ["Mørk chokolade 85%", 10.0, 22.0, 50.0, 20, "række"],
+        ["Mælkechokolade (Marabou)", 4.7, 58.0, 32.0, 25, "række"],
+        ["Hvid chokolade", 6.0, 56.0, 35.0, 20, "række"],
+        ["Snickers bar", 8.6, 60.0, 23.0, 50, "bar"],
+        ["Mars bar", 4.0, 70.0, 17.0, 51, "bar"],
+        ["Twix", 4.5, 64.0, 24.0, 50, "pakke"],
+        ["Bounty", 3.8, 58.0, 26.0, 57, "pakke"],
+        ["KitKat", 7.0, 62.0, 26.0, 41, "pakke"],
+        ["Toms Guldbarre", 6.0, 55.0, 33.0, 45, "stk"],
+        ["Skildpadde (Toms)", 3.5, 65.0, 19.0, 28, "stk"],
+        ["Flødebolle", 3.5, 55.0, 18.0, 30, "stk"],
+        ["Vingummi (Haribo Matador Mix)", 5.5, 78.0, 0.2, 50, "håndfuld"],
+        ["Lakrids (sød/salt)", 3.5, 75.0, 1.0, 50, "håndfuld"],
+        ["Skumfiduser / Skumslik", 4.0, 80.0, 0.1, 40, "håndfuld"],
+        ["Bland-selv slik (gennemsnit)", 4.0, 76.0, 5.0, 100, "portion"],
+        ["Kartoffelchips (Kims / Lays)", 6.0, 52.0, 33.0, 50, "skål/håndfuld"],
+        ["Tortillachips / Nachochips", 6.5, 64.0, 20.0, 50, "håndfuld"],
+        ["Ostepops", 8.0, 52.0, 32.0, 40, "håndfuld"],
+        ["Flæskesvær", 65.0, 0.0, 30.0, 30, "håndfuld"],
+        ["Popcorn (mikrobølgeovn)", 9.0, 55.0, 20.0, 50, "portion"],
+        ["Saltstænger", 11.0, 72.0, 4.0, 30, "håndfuld"],
+        ["Digestive kiks", 7.0, 64.0, 21.0, 15, "stk"],
+        ["Oreo kiks", 5.0, 68.0, 20.0, 11, "stk"],
+        ["Chokoladekiks (Prins/Marie)", 6.5, 66.0, 20.0, 20, "stk"],
+        ["Kanelsnegl", 6.5, 48.0, 16.0, 85, "stk"],
+        ["Tebirkes", 7.5, 42.0, 26.0, 85, "stk"],
+        ["Spandauer / Wienerbrød", 6.0, 45.0, 22.0, 85, "stk"],
+        ["Romkugle / Trøffel", 4.5, 55.0, 16.0, 70, "stk"],
+        ["Studenterbrød", 4.5, 58.0, 14.0, 75, "stk"],
+        ["Drømmekage", 5.0, 56.0, 15.0, 80, "stykke"],
+        ["Chokoladekage / Brownie", 5.5, 52.0, 22.0, 80, "stykke"],
+        ["Gulerodskage (med glasur)", 4.5, 48.0, 20.0, 85, "stykke"],
+        ["Banankage", 5.0, 50.0, 15.0, 80, "stykke"],
+        ["Hindbærsnitte", 4.5, 65.0, 14.0, 85, "stk"],
+        ["Kajkage", 4.5, 52.0, 20.0, 85, "stk"],
+        ["Lagkage (frugt/fløde)", 4.0, 32.0, 14.0, 120, "stykke"],
+        ["Æbleskiver", 6.0, 38.0, 11.0, 30, "stk"],
+        ["Koldskåls-kammerjunkere", 7.5, 68.0, 18.0, 5, "stk"],
+        ["Vaniljeis (flødeis)", 3.5, 24.0, 11.0, 75, "kugle/portion"],
+        ["Chokoladeis", 4.0, 26.0, 12.0, 75, "kugle/portion"],
+        ["Sorbetis", 0.5, 28.0, 0.2, 75, "kugle"],
+        ["Magnum Classic is", 4.5, 31.0, 20.0, 85, "stk"],
+        ["Filur is / Sodavandsis", 0.1, 20.0, 0.1, 60, "stk"],
+        ["Københavnerstang", 1.5, 25.0, 4.0, 65, "stk"]
+      ],
+      "Drikkevarer": [
+        ["Vand", 0.0, 0.0, 0.0, 250, "glas"],
+        ["Kaffe (sort, uden mælk)", 0.1, 0.0, 0.0, 200, "kop"],
+        ["Caffè Latte (med letmælk)", 2.8, 3.8, 1.2, 250, "kop"],
+        ["Cappuccino", 2.5, 3.5, 1.2, 200, "kop"],
+        ["Iskaffe (Starbucks / Arla)", 2.8, 9.5, 1.5, 250, "bæger"],
+        ["Te (sort/grøn/urtete)", 0.0, 0.0, 0.0, 200, "kop"],
+        ["Appelsinjuice", 0.7, 10.0, 0.1, 200, "glas"],
+        ["Æblejuice", 0.1, 10.5, 0.1, 200, "glas"],
+        ["Multifrugtjuice", 0.4, 11.0, 0.1, 200, "glas"],
+        ["Smoothie (jordbær/banan)", 0.8, 12.5, 0.2, 250, "glas"],
+        ["Hyldeblomstsaft (drikkeklar)", 0.0, 7.5, 0.0, 200, "glas"],
+        ["Saftevand (sukkerfri / Fun Light)", 0.0, 0.2, 0.0, 200, "glas"],
+        ["Coca-Cola / Sodavand med sukker", 0.0, 10.6, 0.0, 330, "dåse"],
+        ["Faxe Kondi", 0.0, 10.0, 0.0, 330, "dåse"],
+        ["Pepsi Max / Cola Zero (sukkerfri)", 0.0, 0.0, 0.0, 330, "dåse"],
+        ["Energidrik (Red Bull med sukker)", 0.0, 11.0, 0.0, 250, "dåse"],
+        ["Energidrik (Monster sukkerfri)", 0.0, 0.5, 0.0, 500, "dåse"],
+        ["Vitamin Well", 0.0, 4.2, 0.0, 500, "flaske"],
+        ["State Energy drik", 0.0, 7.0, 0.0, 400, "flaske"],
+        ["Øl (Pilsner, 4.6% - kulhydrat/energi)", 0.4, 3.2, 0.0, 330, "dåse/flaske"],
+        ["Øl (Classic, 4.6%)", 0.5, 3.6, 0.0, 330, "dåse/flaske"],
+        ["Alkoholfri øl", 0.4, 5.5, 0.0, 330, "dåse"],
+        ["Rødvin (13.5% - omregnet energi)", 0.1, 2.5, 0.0, 150, "glas"],
+        ["Hvidvin / Rosévin", 0.1, 3.0, 0.0, 150, "glas"],
+        ["Somersby Cider", 0.0, 8.5, 0.0, 330, "dåse"]
+      ]
+    };
+
+    // Konverter den rå liste til et fladt array med objekter
+    const foodDatabase = [];
+    for (const category in RAW_FOODS) {
+      RAW_FOODS[category].forEach(item => {
+        foodDatabase.push({
+          category: category,
+          name: item[0],
+          p: item[1],
+          c: item[2],
+          f: item[3],
+          pieceWeight: item[4],
+          pieceName: item[5]
+        });
+      });
+    }
+
+    // =========================================================================
+    // 2. LOGIK OG HÅNDTERING AF APPEN
+    // =========================================================================
     let activeDay = 1;
     const storageKey = 'github_pages_macro_app';
 
-    // Hent gemt data fra browserens hukommelse (localStorage)
+    // Hent gemt data fra browserens hukommelse
     let data = JSON.parse(localStorage.getItem(storageKey)) || {
       1: [],
       2: [],
       3: [],
       4: []
     };
+
+    // Fylder rullemenuen (og filtrerer baseret på søgefeltet)
+    function filterFoodDropdown() {
+      const searchText = document.getElementById('searchFood').value.toLowerCase().trim();
+      const selectEl = document.getElementById('foodSelect');
+      selectEl.innerHTML = '';
+
+      // Standard-valgmulighed øverst
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = "";
+      defaultOpt.textContent = searchText 
+        ? `-- Resultater for "${searchText}" --` 
+        : `-- Vælg fødevare (${foodDatabase.length} på listen) --`;
+      selectEl.appendChild(defaultOpt);
+
+      // Gruppér matchende fødevarer efter kategori
+      const grouped = {};
+      let matchCount = 0;
+      let firstMatchIndex = null;
+
+      foodDatabase.forEach((food, index) => {
+        if (
+          food.name.toLowerCase().includes(searchText) ||
+          food.category.toLowerCase().includes(searchText)
+        ) {
+          if (!grouped[food.category]) grouped[food.category] = [];
+          grouped[food.category].push({ ...food, index });
+          matchCount++;
+          if (firstMatchIndex === null) firstMatchIndex = index;
+        }
+      });
+
+      // Indsæt kategorier og fødevarer i dropdown
+      for (const catName in grouped) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = catName;
+
+        grouped[catName].forEach(item => {
+          const option = document.createElement('option');
+          option.value = item.index;
+          option.textContent = `${item.name} (1 ${item.pieceName} ≈ ${item.pieceWeight}g)`;
+          optgroup.appendChild(option);
+        });
+
+        selectEl.appendChild(optgroup);
+      }
+
+      // Hvis man søger og der kun er få resultater, vælg automatisk det første
+      if (searchText && matchCount === 1 && firstMatchIndex !== null) {
+        selectEl.value = firstMatchIndex;
+        onFoodSelected();
+      }
+    }
+
+    // Når brugeren vælger en ny fødevare på listen
+    function onFoodSelected() {
+      const selectEl = document.getElementById('foodSelect');
+      const unitStkOption = document.getElementById('unitStkOption');
+      const unitSelect = document.getElementById('foodUnit');
+      const amountEl = document.getElementById('foodAmount');
+
+      if (selectEl.value === "") return;
+
+      const food = foodDatabase[selectEl.value];
+      // Opdater teksten på "Stk"-muligheden, så man ser hvad 1 stk vejer
+      unitStkOption.textContent = `Stk / ${food.pieceName} (${food.pieceWeight}g)`;
+
+      // Hvis enheden står på gram, men mængden er lille (fx 1), skift til 100g, ellers behold 1 stk
+      if (unitSelect.value === "stk") {
+        amountEl.value = 1;
+        amountEl.step = "0.5";
+      } else {
+        amountEl.value = 100;
+        amountEl.step = "10";
+      }
+
+      calculateFromPreset();
+    }
+
+    // Når man skifter mellem "Stk" og "Gram"
+    function onUnitChanged() {
+      const unit = document.getElementById('foodUnit').value;
+      const amountEl = document.getElementById('foodAmount');
+      const amountLabel = document.getElementById('amountLabel');
+
+      if (unit === "stk") {
+        amountLabel.textContent = "3. Antal (stk)";
+        amountEl.value = 1;
+        amountEl.step = "0.5";
+      } else {
+        amountLabel.textContent = "3. Vægt (gram)";
+        amountEl.value = 100;
+        amountEl.step = "10";
+      }
+
+      calculateFromPreset();
+    }
+
+    // Beregn makroer ud fra valgt fødevare, mængde og enhed (stk eller gram)
+    function calculateFromPreset() {
+      const selectEl = document.getElementById('foodSelect');
+      const amountEl = document.getElementById('foodAmount');
+      const unitEl = document.getElementById('foodUnit');
+      const helperEl = document.getElementById('weightHelper');
+
+      if (selectEl.value === "") return;
+
+      const food = foodDatabase[selectEl.value];
+      const amount = parseFloat(amountEl.value) || 0;
+      const unit = unitEl.value;
+
+      let totalGrams = 0;
+      let displayTitle = "";
+
+      if (unit === "stk") {
+        totalGrams = Math.round(amount * food.pieceWeight);
+        displayTitle = `${amount} ${food.pieceName} ${food.name} (${totalGrams}g)`;
+        helperEl.textContent = `Beregner for ${amount} ${food.pieceName} = ${totalGrams} gram i alt.`;
+      } else {
+        totalGrams = Math.round(amount);
+        displayTitle = `${food.name} (${totalGrams}g)`;
+        helperEl.textContent = `Beregner for ${totalGrams} gram.`;
+      }
+
+      const ratio = totalGrams / 100;
+
+      // Udfyld formularfelterne automatisk
+      document.getElementById('itemName').value = displayTitle;
+      document.getElementById('itemProtein').value = (food.p * ratio).toFixed(1);
+      document.getElementById('itemCarbs').value = (food.c * ratio).toFixed(1);
+      document.getElementById('itemFat').value = (food.f * ratio).toFixed(1);
+    }
 
     function saveState() {
       localStorage.setItem(storageKey, JSON.stringify(data));
@@ -242,6 +1013,7 @@
       render();
     }
 
+    // Gem måltid på den valgte dag
     document.getElementById('foodEntryForm').addEventListener('submit', function(e) {
       e.preventDefault();
 
@@ -250,7 +1022,7 @@
       const carbs = parseFloat(document.getElementById('itemCarbs').value) || 0;
       const fat = parseFloat(document.getElementById('itemFat').value) || 0;
 
-      // Beregn kalorier ud fra makroer
+      // Kalorieformel: 1g P = 4 kcal, 1g K = 4 kcal, 1g F = 9 kcal
       const calories = Math.round((protein * 4) + (carbs * 4) + (fat * 9));
 
       data[activeDay].push({
@@ -264,7 +1036,13 @@
 
       saveState();
       render();
+
+      // Nulstil felter efter gem
       this.reset();
+      document.getElementById('searchFood').value = "";
+      filterFoodDropdown();
+      document.getElementById('foodAmount').value = (document.getElementById('foodUnit').value === "stk") ? "1" : "100";
+      document.getElementById('weightHelper').textContent = "Måltid gemt! Vælg en ny madvare ovenfor.";
     });
 
     function deleteItem(id) {
@@ -305,6 +1083,8 @@
       `;
     }
 
+    // Start appen
+    filterFoodDropdown();
     render();
   </script>
 </body>
