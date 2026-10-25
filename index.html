@@ -317,7 +317,6 @@
       transform: scale(0.98);
     }
 
-    /* Måltids-sektioner i listen */
     .meal-section {
       margin-bottom: 16px;
     }
@@ -476,9 +475,9 @@
       <span id="sectionTitle">Tilføj måltid til Dag 1</span>
     </div>
     
-    <!-- Valg af måltidstype (Morgenmad, Frokost, Aftensmad, Snack) -->
+    <!-- Valg af måltidstype (Morgenmad, Frokost, Aftensmad, Snacks) -->
     <div style="margin-bottom: 12px;">
-      <label for="mealTypeSelect">🍽️ Måltid på dagen</label>
+      <label for="mealTypeSelect">🍽️ Vælg måltid på dagen</label>
       <select id="mealTypeSelect">
         <option value="Morgenmad">Morgenmad</option>
         <option value="Frokost">Frokost</option>
@@ -1308,7 +1307,6 @@
       if (meals.length === 0) {
         listContainer.innerHTML = `<div class="empty-state">Ingen måltider registreret på Dag ${activeDay} endnu.<br>Brug søgefeltet ovenfor til at tilføje mad.</div>`;
       } else {
-        // Gruppér måltider efter måltidstype (Morgenmad, Frokost, Aftensmad, Snacks)
         const categories = ["Morgenmad", "Frokost", "Aftensmad", "Snacks"];
         
         categories.forEach(cat => {
