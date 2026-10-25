@@ -11,21 +11,15 @@
   <meta name="apple-mobile-web-app-title" content="Makro Pro">
 
   <style>
-    /* ==========================================================================
-       1. DESIGN VARIABLER (Farver og skygger samlet ét sted)
-       ========================================================================== */
     :root {
       --bg-color: #f4f6fb;
       --card-bg: #ffffff;
       --text-main: #0f172a;
       --text-muted: #64748b;
       --primary: #3b82f6;
-      
-      /* Farvekoder til makronæringsstoffer */
-      --protein-color: #60a5fa; /* Blå */
-      --carbs-color: #fbbf24;   /* Guld/Orange */
-      --fat-color: #a78bfa;     /* Lilla */
-
+      --protein-color: #60a5fa;
+      --carbs-color: #fbbf24;
+      --fat-color: #a78bfa;
       --radius-lg: 18px;
       --radius-md: 12px;
       --shadow-soft: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
@@ -48,9 +42,6 @@
       line-height: 1.4;
     }
 
-    /* ==========================================================================
-       2. TOP HEADER & DAGSVÆLGER
-       ========================================================================== */
     .app-header {
       display: flex;
       justify-content: space-between;
@@ -77,7 +68,6 @@
       border-radius: 20px;
     }
 
-    /* Moderne Dagsvælger (Pille-design) */
     .segmented-control {
       display: flex;
       background-color: #e2e8f0;
@@ -106,9 +96,6 @@
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
     }
 
-    /* ==========================================================================
-       3. HERO DASHBOARD (Dagens visuelle overblik - UDEN mål)
-       ========================================================================== */
     .hero-card {
       background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
       color: #ffffff;
@@ -144,7 +131,6 @@
       color: #94a3b8;
     }
 
-    /* Visuel fordelingsbjælke (Procent mellem P, K og F) */
     .split-bar-container {
       width: 100%;
       height: 8px;
@@ -160,7 +146,6 @@
       transition: width 0.4s ease;
     }
 
-    /* De 3 makro-bokse i dashboardet */
     .macro-dashboard-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -205,9 +190,6 @@
       margin-top: 2px;
     }
 
-    /* ==========================================================================
-       4. KORT & FORMULAR ELEMENTER
-       ========================================================================== */
     .card {
       background: var(--card-bg);
       border-radius: var(--radius-lg);
@@ -255,13 +237,48 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
     }
 
-    /* Søge- og database-sektion */
+    /* Søgeboks med live dropdown */
     .preset-box {
       background: linear-gradient(180deg, #f0f7ff 0%, #e0effe 100%);
       border: 1px solid #bae6fd;
       padding: 14px;
       border-radius: 14px;
       margin-bottom: 16px;
+      position: relative;
+    }
+
+    .search-wrapper {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    /* Live dropdown liste */
+    .search-results-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      display: none;
+    }
+
+    .search-result-item {
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      color: #1e293b;
+    }
+
+    .search-result-item:hover, .search-result-item:active {
+      background-color: #eff6ff;
+      color: #1d4ed8;
     }
 
     .unit-row {
@@ -280,7 +297,7 @@
       font-size: 0.78rem;
       color: #0369a1;
       font-weight: 600;
-      margin-top: -2px;
+      margin-top: 4px;
     }
 
     .btn-submit {
@@ -302,9 +319,6 @@
       transform: scale(0.98);
     }
 
-    /* ==========================================================================
-       5. MODERNE MÅLTIDSLISTE
-       ========================================================================== */
     .meal-list-container {
       display: flex;
       flex-direction: column;
@@ -410,21 +424,19 @@
     <button class="segment-btn" onclick="setDay(4)">Dag 4</button>
   </div>
 
-  <!-- 3. VISUELT DASHBOARD (Dagens Samlede Indtag - Uden mål) -->
+  <!-- 3. DASHBOARD -->
   <div class="hero-card">
     <div class="hero-top">
       <div class="hero-label" id="dashboardDayLabel">DAG 1 — SAMLET INDTAG</div>
       <div class="hero-kcal" id="totalKcalDisplay">0 <span>kcal</span></div>
     </div>
 
-    <!-- Fordelingsbjælke mellem Protein, Kulhydrat og Fedt -->
     <div class="split-bar-container">
       <div class="split-segment" id="pSplitBar" style="background: var(--protein-color); width: 33.3%;"></div>
       <div class="split-segment" id="cSplitBar" style="background: var(--carbs-color); width: 33.3%;"></div>
       <div class="split-segment" id="fSplitBar" style="background: var(--fat-color); width: 33.4%;"></div>
     </div>
 
-    <!-- De 3 Makronæringsstoffer -->
     <div class="macro-dashboard-grid">
       <div class="macro-stat-box">
         <div class="macro-stat-title"><span class="dot" style="background: var(--protein-color);"></span>Protein</div>
@@ -444,21 +456,19 @@
     </div>
   </div>
 
-  <!-- 4. REGISTRERING AF MÅLTID -->
+  <!-- 4. REGISTRERING -->
   <div class="card">
     <div class="card-header">
       <span id="sectionTitle">Tilføj måltid til Dag 1</span>
     </div>
     
-    <!-- Søg og vælg fra madlisten (500 fødevarer) -->
+    <!-- Live søgeboks -->
     <div class="preset-box">
       <label for="searchFood">🔍 Søg i fødevaredatabasen (500 varer)</label>
-      <input type="text" id="searchFood" placeholder="Søg fx 'kylling', 'æg', 'rugbrød', 'skyr'..." oninput="filterFoodDropdown()">
-
-      <label for="foodSelect">📋 Vælg fødevare</label>
-      <select id="foodSelect" onchange="onFoodSelected()">
-        <option value="">-- Vælg fra listen --</option>
-      </select>
+      <div class="search-wrapper">
+        <input type="text" id="searchFood" placeholder="Skriv fx 'kylling' eller 'æg'..." autocomplete="off" oninput="onSearchInput()">
+        <div id="searchResults" class="search-results-dropdown"></div>
+      </div>
 
       <div class="unit-row">
         <div>
@@ -475,14 +485,14 @@
       </div>
 
       <div class="helper-text" id="weightHelper">
-        Vælg en fødevare ovenfor for automatisk beregning.
+        Søg og tryk på en madvare ovenfor for at vælge den.
       </div>
     </div>
 
-    <!-- Formular der gemmer måltidet -->
+    <!-- Formular -->
     <form id="foodEntryForm">
-      <label for="itemName">Måltidets navn (eller indtast manuelt)</label>
-      <input type="text" id="itemName" placeholder="Fx 2 stk. Æg (120g)" required>
+      <label for="itemName">Måltidets navn</label>
+      <input type="text" id="itemName" placeholder="Vælg en vare eller skriv manuelt" required>
 
       <div class="input-row">
         <div>
@@ -503,7 +513,7 @@
     </form>
   </div>
 
-  <!-- 5. DAGENS REGISTREREDE MÅLTIDER -->
+  <!-- 5. LISTE -->
   <div class="card">
     <div class="card-header">
       <span>Dagens måltider</span>
@@ -514,10 +524,7 @@
   </div>
 
   <script>
-    // =========================================================================
-    // 1. KOMPLET FØDEVAREDATABASE (500 FØDEVARER)
-    // Format: ["Navn", Protein_pr_100g, Kulhydrat_pr_100g, Fedt_pr_100g, Gram_pr_stk, "Enhedsnavn"]
-    // =========================================================================
+    // 500 Fødevarer database
     const RAW_FOODS = {
       "Kød & Fjerkræ": [
         ["Kyllingebryst (rå)", 23.0, 0.0, 1.5, 150, "bryst"],
@@ -1096,10 +1103,8 @@
       });
     }
 
-    // =========================================================================
-    // 2. LOGIK OG INTERAKTION
-    // =========================================================================
     let activeDay = 1;
+    let selectedFoodIndex = null;
     const storageKey = 'github_pages_macro_app';
 
     let data = JSON.parse(localStorage.getItem(storageKey)) || {
@@ -1109,64 +1114,57 @@
       4: []
     };
 
-    function filterFoodDropdown() {
-      const searchText = document.getElementById('searchFood').value.toLowerCase().trim();
-      const selectEl = document.getElementById('foodSelect');
-      selectEl.innerHTML = '';
+    // Live søgning der viser resultater lige nedenunder
+    function onSearchInput() {
+      const query = document.getElementById('searchFood').value.toLowerCase().trim();
+      const dropdown = document.getElementById('searchResults');
+      dropdown.innerHTML = '';
 
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = "";
-      defaultOpt.textContent = searchText 
-        ? `-- Resultater for "${searchText}" --` 
-        : `-- Vælg fødevare (${foodDatabase.length} varer) --`;
-      selectEl.appendChild(defaultOpt);
+      if (query.length === 0) {
+        dropdown.style.display = 'none';
+        selectedFoodIndex = null;
+        return;
+      }
 
-      const grouped = {};
-      let matchCount = 0;
-      let firstMatchIndex = null;
-
+      const matches = [];
       foodDatabase.forEach((food, index) => {
-        if (
-          food.name.toLowerCase().includes(searchText) ||
-          food.category.toLowerCase().includes(searchText)
-        ) {
-          if (!grouped[food.category]) grouped[food.category] = [];
-          grouped[food.category].push({ ...food, index });
-          matchCount++;
-          if (firstMatchIndex === null) firstMatchIndex = index;
+        if (food.name.toLowerCase().includes(query)) {
+          matches.push({ ...food, index });
         }
       });
 
-      for (const catName in grouped) {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = catName;
-
-        grouped[catName].forEach(item => {
-          const option = document.createElement('option');
-          option.value = item.index;
-          option.textContent = `${item.name} (1 ${item.pieceName} ≈ ${item.pieceWeight}g)`;
-          optgroup.appendChild(option);
-        });
-
-        selectEl.appendChild(optgroup);
+      if (matches.length === 0) {
+        dropdown.style.display = 'none';
+        return;
       }
 
-      if (searchText && matchCount === 1 && firstMatchIndex !== null) {
-        selectEl.value = firstMatchIndex;
-        onFoodSelected();
-      }
+      // Vis op til 15 resultater for ikke at overvælde skærmen
+      matches.slice(0, 15).forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'search-result-item';
+        div.innerHTML = `<strong>${item.name}</strong> <span style="color:#64748b; font-size:0.8rem;">(${item.category})</span>`;
+        div.onclick = function() {
+          selectFoodItem(item.index);
+        };
+        dropdown.appendChild(div);
+      });
+
+      dropdown.style.display = 'block';
     }
 
-    function onFoodSelected() {
-      const selectEl = document.getElementById('foodSelect');
+    // Når brugeren klikker på en madvare i dropdown-listen
+    function selectFoodItem(index) {
+      selectedFoodIndex = index;
+      const food = foodDatabase[index];
+
+      document.getElementById('searchFood').value = food.name;
+      document.getElementById('searchResults').style.display = 'none';
+
       const unitStkOption = document.getElementById('unitStkOption');
+      unitStkOption.textContent = `Stk / ${food.pieceName} (${food.pieceWeight}g)`;
+
       const unitSelect = document.getElementById('foodUnit');
       const amountEl = document.getElementById('foodAmount');
-
-      if (selectEl.value === "") return;
-
-      const food = foodDatabase[selectEl.value];
-      unitStkOption.textContent = `Stk / ${food.pieceName} (${food.pieceWeight}g)`;
 
       if (unitSelect.value === "stk") {
         amountEl.value = 1;
@@ -1198,16 +1196,12 @@
     }
 
     function calculateFromPreset() {
-      const selectEl = document.getElementById('foodSelect');
-      const amountEl = document.getElementById('foodAmount');
-      const unitEl = document.getElementById('foodUnit');
+      if (selectedFoodIndex === null) return;
+
+      const food = foodDatabase[selectedFoodIndex];
+      const amount = parseFloat(document.getElementById('foodAmount').value) || 0;
+      const unit = document.getElementById('foodUnit').value;
       const helperEl = document.getElementById('weightHelper');
-
-      if (selectEl.value === "") return;
-
-      const food = foodDatabase[selectEl.value];
-      const amount = parseFloat(amountEl.value) || 0;
-      const unit = unitEl.value;
 
       let totalGrams = 0;
       let displayTitle = "";
@@ -1268,8 +1262,7 @@
 
       this.reset();
       document.getElementById('searchFood').value = "";
-      filterFoodDropdown();
-      document.getElementById('foodAmount').value = (document.getElementById('foodUnit').value === "stk") ? "1" : "100";
+      selectedFoodIndex = null;
       document.getElementById('weightHelper').textContent = "✅ Måltid tilføjet til dagens log!";
     });
 
@@ -1279,7 +1272,6 @@
       render();
     }
 
-    // Opdater måltidskort og det visuelle dashboard uden mål
     function render() {
       const listContainer = document.getElementById('entriesList');
       listContainer.innerHTML = '';
@@ -1290,7 +1282,7 @@
       document.getElementById('mealCountBadge').textContent = `${meals.length} ${meals.length === 1 ? 'måltid' : 'måltider'}`;
 
       if (meals.length === 0) {
-        listContainer.innerHTML = `<div class="empty-state">Ingen måltider registreret på Dag ${activeDay} endnu.<br>Brug formularen ovenfor til at tilføje mad.</div>`;
+        listContainer.innerHTML = `<div class="empty-state">Ingen måltider registreret på Dag ${activeDay} endnu.<br>Brug søgefeltet ovenfor til at tilføje mad.</div>`;
       } else {
         meals.forEach(item => {
           totalP += item.protein;
@@ -1318,27 +1310,24 @@
         });
       }
 
-      // Opdater samlede gram og kalorier i top-dashboardet
       document.getElementById('totalKcalDisplay').innerHTML = `${totalKcal} <span>kcal</span>`;
       document.getElementById('totalPDisplay').textContent = `${totalP.toFixed(1)}g`;
       document.getElementById('totalCDisplay').textContent = `${totalC.toFixed(1)}g`;
       document.getElementById('totalFDisplay').textContent = `${totalF.toFixed(1)}g`;
 
-      // Udregn procentfordeling mellem P, K og F (baseret på gram)
       const totalMacroGrams = totalP + totalC + totalF;
       let pPct = 0, cPct = 0, fPct = 0;
 
       if (totalMacroGrams > 0) {
         pPct = Math.round((totalP / totalMacroGrams) * 100);
         cPct = Math.round((totalC / totalMacroGrams) * 100);
-        fPct = 100 - pPct - cPct; // Sikrer at summen altid giver præcis 100%
+        fPct = 100 - pPct - cPct;
       }
 
       document.getElementById('pPctDisplay').textContent = `${pPct}%`;
       document.getElementById('cPctDisplay').textContent = `${cPct}%`;
       document.getElementById('fPctDisplay').textContent = `${fPct}%`;
 
-      // Opdater fordelingsbjælken (hvis 0, vis 3 lige store dele som neutral visning)
       if (totalMacroGrams === 0) {
         document.getElementById('pSplitBar').style.width = '33.3%';
         document.getElementById('cSplitBar').style.width = '33.3%';
@@ -1350,8 +1339,6 @@
       }
     }
 
-    // Start appen
-    filterFoodDropdown();
     render();
   </script>
 </body>
