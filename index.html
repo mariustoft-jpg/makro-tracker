@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Makro Tracker</title>
+
+  <!-- iOS PWA Konfiguration -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Makro">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      background-color: #f2f2f7;
+      color: #1c1c1e;
+      margin: 0;
+      padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px) 16px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      text-align: center;
+      margin: 10px 0 16px 0;
+    }
+
+    /* Faner til valg af dag (1-4) */
+    .segmented-control {
+      display: flex;
+      background-color: #e5e5ea;
+      padding: 3px;
+      border-radius: 9px;
+      margin-bottom: 16px;
+    }
+
+    .segment-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #3a3a3c;
+      cursor: pointer;
+    }
+
+    .segment-btn.active {
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Kasser til formular og lister */
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: #636366;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #c7c7cc;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 12px;
+      background-color: #fbfbfb;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #007aff;
+      background-color: #ffffff;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 12px;
+      background-color: #34c759;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Tabeller og slet-knapper */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 6px;
+    }
+
+    th, td {
+      padding: 8px 4px;
+      text-align: left;
+      border-bottom: 1px solid #e5e5ea;
+    }
+
+    th {
+      color: #8e8e93;
+      font-weight: 600;
+    }
+
+    .btn-delete {
+      background-color: #ff3b30;
+      color: #ffffff;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    /* Opsummering i bunden */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      background-color: #f2f2f7;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 14px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Makroer (4 Dage)</h1>
+
+  <!-- Vælg dag -->
+  <div class="segmented-control">
+    <button class="segment-btn active" onclick="setDay(1)">Dag 1</button>
+    <button class="segment-btn" onclick="setDay(2)">Dag 2</button>
+    <button class="segment-btn" onclick="setDay(3)">Dag 3</button>
+    <button class="segment-btn" onclick="setDay(4)">Dag 4</button>
+  </div>
+
+  <!-- Indtastning -->
+  <div class="card">
+    <div id="sectionTitle" style="font-weight:bold; margin-bottom:10px;">Tilføj mad til Dag 1</div>
+    <form id="foodEntryForm">
+      <label>Madvare</label>
+      <input type="text" id="itemName" placeholder="Fx Havregryn, æg, kylling" required>
+
+      <div class="input-row">
+        <div>
+          <label>Protein (g)</label>
+          <input type="number" id="itemProtein" step="0.1" min="0" placeholder="0" required>
+        </div>
+        <div>
+          <label>Kulhydrat (g)</label>
+          <input type="number" id="itemCarbs" step="0.1" min="0" placeholder="0" required>
+        </div>
+        <div>
+          <label>Fedt (g)</label>
+          <input type="number" id="itemFat" step="0.1" min="0" placeholder="0" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Gem måltid</button>
+    </form>
+  </div>
+
+  <!-- Oversigt -->
+  <div class="card">
+    <div style="font-weight:bold; margin-bottom:6px;">Dagens måltider</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Mad</th>
+          <th>P</th>
+          <th>K</th>
+          <th>F</th>
+          <th>Kcal</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="entriesList"></tbody>
+    </table>
+
+    <div class="summary-grid" id="totalsDisplay">
+      <div>Protein: 0 g</div>
+      <div>Kulhydrat: 0 g</div>
+      <div>Fedt: 0 g</div>
+      <div>I alt: 0 kcal</div>
+    </div>
+  </div>
+
+  <script>
+    let activeDay = 1;
+    const storageKey = 'github_pages_macro_app';
+
+    // Hent gemt data fra browserens hukommelse (localStorage)
+    let data = JSON.parse(localStorage.getItem(storageKey)) || {
+      1: [],
+      2: [],
+      3: [],
+      4: []
+    };
+
+    function saveState() {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+    }
+
+    function setDay(day) {
+      activeDay = day;
+      document.querySelectorAll('.segment-btn').forEach((btn, index) => {
+        btn.classList.toggle('active', (index + 1) === day);
+      });
+      document.getElementById('sectionTitle').innerText = `Tilføj mad til Dag ${day}`;
+      render();
+    }
+
+    document.getElementById('foodEntryForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('itemName').value;
+      const protein = parseFloat(document.getElementById('itemProtein').value) || 0;
+      const carbs = parseFloat(document.getElementById('itemCarbs').value) || 0;
+      const fat = parseFloat(document.getElementById('itemFat').value) || 0;
+
+      // Beregn kalorier ud fra makroer
+      const calories = Math.round((protein * 4) + (carbs * 4) + (fat * 9));
+
+      data[activeDay].push({
+        id: Date.now(),
+        name,
+        protein,
+        carbs,
+        fat,
+        calories
+      });
+
+      saveState();
+      render();
+      this.reset();
+    });
+
+    function deleteItem(id) {
+      data[activeDay] = data[activeDay].filter(item => item.id !== id);
+      saveState();
+      render();
+    }
+
+    function render() {
+      const tbody = document.getElementById('entriesList');
+      tbody.innerHTML = '';
+
+      let totalP = 0, totalC = 0, totalF = 0, totalKcal = 0;
+
+      data[activeDay].forEach(item => {
+        totalP += item.protein;
+        totalC += item.carbs;
+        totalF += item.fat;
+        totalKcal += item.calories;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${item.name}</strong></td>
+          <td>${item.protein}</td>
+          <td>${item.carbs}</td>
+          <td>${item.fat}</td>
+          <td>${item.calories}</td>
+          <td><button class="btn-delete" onclick="deleteItem(${item.id})">X</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('totalsDisplay').innerHTML = `
+        <div>Protein: <strong>${totalP.toFixed(1)} g</strong></div>
+        <div>Kulhydrat: <strong>${totalC.toFixed(1)} g</strong></div>
+        <div>Fedt: <strong>${totalF.toFixed(1)} g</strong></div>
+        <div>I alt: <strong>${totalKcal} kcal</strong></div>
+      `;
+    }
+
+    render();
+  </script>
+</body>
+</html>
