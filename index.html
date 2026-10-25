@@ -237,7 +237,6 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
     }
 
-    /* Samlet søgeboks */
     .preset-box {
       background: linear-gradient(180deg, #f0f7ff 0%, #e0effe 100%);
       border: 1px solid #bae6fd;
@@ -252,7 +251,6 @@
       margin-bottom: 12px;
     }
 
-    /* Live dropdown liste lige under feltet */
     .search-results-dropdown {
       position: absolute;
       top: 100%;
@@ -319,10 +317,26 @@
       transform: scale(0.98);
     }
 
+    /* Måltids-sektioner i listen */
+    .meal-section {
+      margin-bottom: 16px;
+    }
+
+    .meal-section-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+
     .meal-list-container {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .meal-item-card {
@@ -462,6 +476,17 @@
       <span id="sectionTitle">Tilføj måltid til Dag 1</span>
     </div>
     
+    <!-- Valg af måltidstype (Morgenmad, Frokost, Aftensmad, Snack) -->
+    <div style="margin-bottom: 12px;">
+      <label for="mealTypeSelect">🍽️ Måltid på dagen</label>
+      <select id="mealTypeSelect">
+        <option value="Morgenmad">Morgenmad</option>
+        <option value="Frokost">Frokost</option>
+        <option value="Aftensmad">Aftensmad</option>
+        <option value="Snacks">Snacks</option>
+      </select>
+    </div>
+
     <!-- Samlet søg og vælg fødevare felt -->
     <div class="preset-box">
       <label for="searchFood">🔍 Søg og vælg fødevare (500 varer)</label>
@@ -1239,6 +1264,7 @@
       e.preventDefault();
 
       const name = document.getElementById('itemName').value;
+      const mealType = document.getElementById('mealTypeSelect').value;
       const protein = parseFloat(document.getElementById('itemProtein').value) || 0;
       const carbs = parseFloat(document.getElementById('itemCarbs').value) || 0;
       const fat = parseFloat(document.getElementById('itemFat').value) || 0;
@@ -1247,6 +1273,7 @@
 
       data[activeDay].push({
         id: Date.now(),
+        mealType: mealType,
         name,
         protein,
         carbs,
@@ -1281,29 +1308,44 @@
       if (meals.length === 0) {
         listContainer.innerHTML = `<div class="empty-state">Ingen måltider registreret på Dag ${activeDay} endnu.<br>Brug søgefeltet ovenfor til at tilføje mad.</div>`;
       } else {
-        meals.forEach(item => {
-          totalP += item.protein;
-          totalC += item.carbs;
-          totalF += item.fat;
-          totalKcal += item.calories;
+        // Gruppér måltider efter måltidstype (Morgenmad, Frokost, Aftensmad, Snacks)
+        const categories = ["Morgenmad", "Frokost", "Aftensmad", "Snacks"];
+        
+        categories.forEach(cat => {
+          const catMeals = meals.filter(m => m.mealType === cat);
+          if (catMeals.length > 0) {
+            const section = document.createElement('div');
+            section.className = 'meal-section';
+            
+            let html = `<div class="meal-section-title">${cat}</div>`;
+            
+            catMeals.forEach(item => {
+              totalP += item.protein;
+              totalC += item.carbs;
+              totalF += item.fat;
+              totalKcal += item.calories;
 
-          const card = document.createElement('div');
-          card.className = 'meal-item-card';
-          card.innerHTML = `
-            <div class="meal-info">
-              <div class="meal-title">${item.name}</div>
-              <div class="meal-badges">
-                <span class="badge badge-p">P: ${item.protein}g</span>
-                <span class="badge badge-c">K: ${item.carbs}g</span>
-                <span class="badge badge-f">F: ${item.fat}g</span>
-              </div>
-            </div>
-            <div class="meal-right">
-              <div class="meal-kcal">${item.calories} <span>kcal</span></div>
-              <button class="btn-delete" onclick="deleteItem(${item.id})" title="Slet">✕</button>
-            </div>
-          `;
-          listContainer.appendChild(card);
+              html += `
+                <div class="meal-item-card" style="margin-bottom: 8px;">
+                  <div class="meal-info">
+                    <div class="meal-title">${item.name}</div>
+                    <div class="meal-badges">
+                      <span class="badge badge-p">P: ${item.protein}g</span>
+                      <span class="badge badge-c">K: ${item.carbs}g</span>
+                      <span class="badge badge-f">F: ${item.fat}g</span>
+                    </div>
+                  </div>
+                  <div class="meal-right">
+                    <div class="meal-kcal">${item.calories} <span>kcal</span></div>
+                    <button class="btn-delete" onclick="deleteItem(${item.id})" title="Slet">✕</button>
+                  </div>
+                </div>
+              `;
+            });
+
+            section.innerHTML = html;
+            listContainer.appendChild(section);
+          }
         });
       }
 
